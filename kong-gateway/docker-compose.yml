@@ -1,0 +1,55 @@
+services:
+  # --- Kong (DB-less) ---
+  kong:
+    image: kong:3.6
+    restart: unless-stopped
+    environment:
+      KONG_DATABASE: "off"
+      KONG_PROXY_LISTEN: "0.0.0.0:8080, 0.0.0.0:8443 ssl"
+      KONG_ADMIN_LISTEN: "0.0.0.0:8001, 0.0.0.0:8444 ssl"
+    ports:
+      - "8080:8080"   # proxy
+      - "8443:8443"   # proxy SSL (opcional)
+      - "8001:8001"   # admin
+      - "8444:8444"   # admin SSL (opcional)
+
+  konga-db:
+    image: postgres:11
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: konga
+      POSTGRES_USER: konga
+      POSTGRES_PASSWORD: konga
+      POSTGRES_INITDB_ARGS: "--auth=md5"
+    command: ["-c", "ssl=off"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U konga -d konga || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - konga_db_data:/var/lib/postgresql/data
+  konga:
+    image: pantsel/konga:latest
+    restart: unless-stopped
+    depends_on:
+      konga-db:
+        condition: service_healthy
+    entrypoint:
+      - /bin/sh
+      - -lc
+      - "DB_URI='postgres://konga:konga@konga-db:5432/konga?ssl=false' node /app/bin/konga.js prepare --adapter postgres --uri \"$DB_URI\" && node app.js"
+    environment:
+      NODE_ENV: production
+      DB_URI: "postgres://konga:konga@konga-db:5432/konga?ssl=false"
+      DB_POOLSIZE: "5"
+      TOKEN_SECRET: "changeme-please"
+      KONGA_SEED_USER: admin
+      KONGA_SEED_USER_PASSWORD: admin123
+      KONGA_SEED_USER_EMAIL: admin@example.com
+    ports:
+      - "1337:1337"
+
+ 
+volumes:
+  konga_db_data:
