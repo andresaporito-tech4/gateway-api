@@ -12,13 +12,13 @@ jobs:
 
     steps:
       # ---------------------------------------------------
-      # 1️⃣ Checkout do código
+      # 1️⃣ Checkout
       # ---------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
       # ---------------------------------------------------
-      # 2️⃣ Validar Docker (igual aos outros que funcionam)
+      # 2️⃣ Validar Docker
       # ---------------------------------------------------
       - name: Validate Docker
         shell: powershell
@@ -26,8 +26,22 @@ jobs:
           docker info
 
       # ---------------------------------------------------
-      # 3️⃣ Build da imagem (DENTRO da pasta Gateway.Api)
-      #    🔴 NÃO mexe no Dockerfile
+      # 3️⃣ Configurar KUBECONFIG (IGUAL INFRA-K8S)
+      # ---------------------------------------------------
+      - name: Configure kubeconfig
+        shell: powershell
+        run: |
+          $source = "C:\Users\Matheus\.kube\config"
+          $targetDir = "C:\actions-runner\_kube"
+          $target = "$targetDir\config"
+
+          New-Item -ItemType Directory -Force -Path $targetDir | Out-Null
+          Copy-Item $source $target -Force
+
+          "KUBECONFIG=$target" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      # ---------------------------------------------------
+      # 4️⃣ Build Docker (DENTRO da pasta Gateway.Api)
       # ---------------------------------------------------
       - name: Build Docker image
         shell: powershell
@@ -36,22 +50,17 @@ jobs:
           docker build -t gateway-api:latest .
 
       # ---------------------------------------------------
-      # 4️⃣ Deploy no Kubernetes
-      #    🔴 SEM proxy, SEM validação OpenAPI
+      # 5️⃣ Deploy Kubernetes (SEM OPENAPI / SEM PROXY)
       # ---------------------------------------------------
       - name: Deploy to Kubernetes
         shell: powershell
         run: |
-          $env:HTTP_PROXY=""
-          $env:HTTPS_PROXY=""
-          $env:NO_PROXY="localhost,127.0.0.1,10.0.0.0/8,192.168.0.0/16,kubernetes.docker.internal"
-
           kubectl apply -f k8s/ -n fiap-cloud-games --validate=false
           kubectl rollout restart deployment gateway-api -n fiap-cloud-games
           kubectl rollout status deployment gateway-api -n fiap-cloud-games
 
       # ---------------------------------------------------
-      # 5️⃣ Verificação final
+      # 6️⃣ Verificação final
       # ---------------------------------------------------
       - name: Verify deployment
         shell: powershell
