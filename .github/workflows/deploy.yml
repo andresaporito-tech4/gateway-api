@@ -1,0 +1,58 @@
+name: Deploy Gateway API
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Build and Deploy Gateway API
+    runs-on: self-hosted
+
+    steps:
+      # ---------------------------------------
+      # 1️⃣ Checkout
+      # ---------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ---------------------------------------
+      # 2️⃣ Validar ambiente
+      # ---------------------------------------
+      - name: Validate Docker and Kubernetes
+        shell: powershell
+        run: |
+          docker info
+          kubectl cluster-info
+
+      # ---------------------------------------
+      # 3️⃣ Build da imagem Docker
+      # CONTEXTO = Gateway.Api (REGRA DE OURO)
+      # ---------------------------------------
+      - name: Build Docker image
+        shell: powershell
+        run: |
+          docker build `
+            -t gateway-api:latest `
+            Gateway.Api
+
+      # ---------------------------------------
+      # 4️⃣ Deploy no Kubernetes
+      # (sem validação para evitar erro OpenAPI)
+      # ---------------------------------------
+      - name: Deploy to Kubernetes
+        shell: powershell
+        run: |
+          kubectl apply -f k8s/ -n fiap-cloud-games --validate=false
+          kubectl rollout restart deployment gateway-api -n fiap-cloud-games
+
+      # ---------------------------------------
+      # 5️⃣ Verificação
+      # ---------------------------------------
+      - name: Verify deployment
+        shell: powershell
+        run: |
+          kubectl rollout status deployment gateway-api -n fiap-cloud-games
+          kubectl get pods -n fiap-cloud-games
+          kubectl get svc -n fiap-cloud-games
