@@ -18,41 +18,48 @@ jobs:
         uses: actions/checkout@v4
 
       # ---------------------------------------
-      # 2️⃣ Validar ambiente
+      # 2️⃣ Validar Docker
       # ---------------------------------------
-      - name: Validate Docker and Kubernetes
+      - name: Validate Docker
         shell: powershell
         run: |
           docker info
-          kubectl cluster-info
 
       # ---------------------------------------
-      # 3️⃣ Build da imagem Docker
-      # CONTEXTO = Gateway.Api (REGRA DE OURO)
+      # 3️⃣ DESATIVAR PROXY (CAUSA DO ERRO <)
+      # ---------------------------------------
+      - name: Disable proxy for kubectl
+        shell: powershell
+        run: |
+          $env:HTTP_PROXY=""
+          $env:HTTPS_PROXY=""
+          $env:NO_PROXY="localhost,127.0.0.1,10.0.0.0/8,192.168.0.0/16,kubernetes.docker.internal"
+
+      # ---------------------------------------
+      # 4️⃣ Build Docker (SEM MEXER NO DOCKERFILE)
       # ---------------------------------------
       - name: Build Docker image
         shell: powershell
         run: |
           docker build `
             -t gateway-api:latest `
-            Gateway.Api
+            -f Gateway.Api/Dockerfile `
+            .
 
       # ---------------------------------------
-      # 4️⃣ Deploy no Kubernetes
-      # (sem validação para evitar erro OpenAPI)
+      # 5️⃣ Deploy Kubernetes
       # ---------------------------------------
       - name: Deploy to Kubernetes
         shell: powershell
         run: |
-          kubectl apply -f k8s/ -n fiap-cloud-games --validate=false
-          kubectl rollout restart deployment gateway-api -n fiap-cloud-games
+          kubectl apply -f k8s/ -n fiap-cloud-games
+          kubectl rollout status deployment gateway-api -n fiap-cloud-games
 
       # ---------------------------------------
-      # 5️⃣ Verificação
+      # 6️⃣ Verificação final
       # ---------------------------------------
       - name: Verify deployment
         shell: powershell
         run: |
-          kubectl rollout status deployment gateway-api -n fiap-cloud-games
           kubectl get pods -n fiap-cloud-games
-          kubectl get svc -n fiap-cloud-games
+          kubectl get svc  -n fiap-cloud-games
