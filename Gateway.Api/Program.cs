@@ -2,9 +2,7 @@ using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// -----------------------------------------------------
-// CORS - NECESSÁRIO para Angular chamar o Gateway
-// -----------------------------------------------------
+// CORS liberado total (demo/apresentação)
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
@@ -15,23 +13,17 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Controllers
 builder.Services.AddControllers();
 
-// Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// YARP
 builder.Services.AddReverseProxy()
     .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
 
 var app = builder.Build();
 
-// -----------------------------------------------------
-// Middleware
-// -----------------------------------------------------
-app.UseCors("AllowAll");  // <---- OBRIGATÓRIO
+app.UseCors("AllowAll");
 
 app.UseSwagger();
 app.UseSwaggerUI();
@@ -39,7 +31,6 @@ app.UseSwaggerUI();
 app.MapControllers();
 app.MapReverseProxy();
 
-// endpoint de métricas do Prometheus
 app.MapMetrics();
 
 app.Run();
